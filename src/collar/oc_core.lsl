@@ -74,6 +74,13 @@ string ALL = "ALL";
 key g_kWeldBy;
 list g_lMainMenu=["Apps", "Addons", "Access", "Settings", "Help/About"];
 
+string g_sOpenLockLinkDesc="OpenLock"; // Prim description of elements that should be shown when unlocked
+string g_sClosedLockLinkDesc="ClosedLock"; // Prim description of elements that should be shown when locked
+list g_lClosedLockLinks; //to store the locks prim to hide or show
+list g_lOpenLockLinks; //to store the locks prim to hide or show
+key g_kOpenLockSound = "ee94315e-f69b-c753-629c-97bd865b7094";
+key g_kCloseLockSound = "abdb1eaa-6160-b056-96d8-94f548a14dda";
+
 Dialog(key kID, string sPrompt, list lChoices, list lUtilityButtons, integer iPage, integer iAuth, string sName) {
     key kMenuID = llGenerateKey();
     llMessageLinked(LINK_SET, DIALOG, (string)kID + "|" + sPrompt + "|" + (string)iPage + "|" + llDumpList2String(lChoices, "`") + "|" + llDumpList2String(lUtilityButtons, "`") + "|" + (string)iAuth, kMenuID);
@@ -168,6 +175,29 @@ integer g_iUpdatePin = 0;
 string g_sDeviceName;
 string g_sWearerName;
 
+GetElementLinks() {
+    integer n = llGetObjectPrimCount(llGetKey());
+    integer i;
+    for (i = 1; i <= n; ++i) {
+        string sDescField = llList2String(llGetLinkPrimitiveParams(i, [PRIM_DESC]), 0);
+        list lDescArgs = llParseString2List(sDescField, ["~"], []);
+        string sDescID = llList2String(lDescArgs, 0);
+        if (sDescID == g_sOpenLockLinkDesc) g_lOpenLockLinks += [i];
+        else if (sDescID == g_sClosedLockLinkDesc) g_lClosedLockLinks += [i];
+    }
+}
+
+UpdateVisualLock() {
+    integer n = llGetListLength(g_lOpenLockLinks);
+    integer i;
+    for (i = 0; i < n; ++i) {
+        llSetLinkAlpha(llList2Integer(g_lOpenLockLinks, i), 1.0 - (float)g_iLocked, ALL_SIDES);
+    }
+    n = llGetListLength(g_lClosedLockLinks);
+    for (i = 0; i < n; ++i) {
+        llSetLinkAlpha(llList2Integer(g_lClosedLockLinks, i), (float)g_iLocked, ALL_SIDES);
+    }
+}
 
 UserCommand(integer iNum, string sStr, key kID) {
     if (iNum != CMD_OWNER && iNum != CMD_WEARER && iNum != CMD_TRUSTED) return;
@@ -279,10 +309,14 @@ UserCommand(integer iNum, string sStr, key kID) {
         } else if(llToLower(sChangetype)=="lock" && !g_iWelded && (iNum == CMD_OWNER || iNum == CMD_WEARER)){
             // allow locking
             g_iLocked=TRUE;
+            llPlaySound(g_kCloseLockSound, 1.0);
+            UpdateVisualLock();
             llMessageLinked(LINK_SET, LM_SETTING_SAVE, "global_locked="+(string)g_iLocked,"");
             llMessageLinked(LINK_SET, NOTIFY, "1%WEARERNAME%'s collar has been locked", kID);
         } else if(llToLower(sChangetype) == "unlock" && (iNum == CMD_OWNER || iNum == CMD_TRUSTED) && !g_iWelded){
             g_iLocked=FALSE;
+            llPlaySound(g_kOpenLockSound, 1.0);
+            UpdateVisualLock();
             llMessageLinked(LINK_SET, LM_SETTING_DELETE, "global_locked","");
             llMessageLinked(LINK_SET, NOTIFY, "1%WEARERNAME%'s collar has been unlocked", kID);
         } else {
@@ -377,7 +411,7 @@ default
     state_entry()
     {
         g_kWearer = llGetOwner();
-        
+        GetElementLinks();
         llMessageLinked(LINK_SET, 0, "initialize", llGetKey());
     }
     touch_start(integer iNum){
