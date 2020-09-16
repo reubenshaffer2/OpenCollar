@@ -176,7 +176,7 @@ string g_sDeviceName;
 string g_sWearerName;
 
 GetElementLinks() {
-    integer n = llGetObjectPrimCount(llGetKey());
+    integer n = llGetNumberOfPrims();
     integer i;
     for (i = 1; i <= n; ++i) {
         string sDescField = llList2String(llGetLinkPrimitiveParams(i, [PRIM_DESC]), 0);
